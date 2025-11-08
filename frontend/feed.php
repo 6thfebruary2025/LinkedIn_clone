@@ -114,438 +114,257 @@ $profileImage = $_SESSION['profile_image'] ?? null;
 </div>
 
 <script>
-/* ========== Configuration ========== */
-const CURRENT_USER_ID = <?= json_encode($userId) ?>;
+const API_BASE = 'https://your-backend.up.railway.app/api/'; // <-- REPLACE with your Railway backend URL
 
-/* ========== Helpers ========== */
-function escapeHtml(text){
-  if (text === null || text === undefined) return '';
-  return String(text)
-    .replace(/&/g,'&amp;')
-    .replace(/</g,'&lt;')
-    .replace(/>/g,'&gt;');
-}
-function formatDate(s){
-  try { return new Date(s).toLocaleString(); } catch(e) { return s; }
-}
-async function getJSON(url){
-  const r = await fetch(url, { cache: 'no-store' });
-  return r.json();
-}
+function escapeHtml(text){ if(!text) return ''; return text.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
 
-/* ========== Renderers ========== */
-function renderPostCard(p){
-  const liked = p.user_liked == 1;
-  const heart = liked ? '❤️' : '🤍';
-  const avatarHtml = p.profile_image
-    ? `<img src="../${escapeHtml(p.profile_image)}" class="rounded-circle me-2 rounded-white-border" style="width:48px;height:48px;object-fit:cover;">`
-    : `<div class="avatar me-2" style="width:48px;height:48px;font-size:1.1rem;">${escapeHtml(p.user_name.charAt(0).toUpperCase())}</div>`;
-  const imageHtml = p.image_path ? `<div class="mt-3"><img src="../${escapeHtml(p.image_path)}" class="post-image"></div>` : '';
-  const controls = (p.user_id == CURRENT_USER_ID)
-    ? `<div class="d-flex gap-2">
-         <button class="btn btn-sm btn-outline-secondary edit-post" data-id="${p.id}">Edit</button>
-         <button class="btn btn-sm btn-outline-danger delete-post" data-id="${p.id}">Delete</button>
-       </div>`
-    : '';
-
-  // Note: comment_count is displayed but authoritative count comes from fetch_comments response
+// ===== Render a single post =====
+function renderPost(p){
+  const created = new Date(p.created_at).toLocaleString();
+  const liked = p.user_liked==1?'❤️':'🤍';
+  const own = p.user_id == <?= json_encode($userId) ?>;
+  const controls = own ? `<button class="btn btn-sm btn-gradient edit-post" data-id="${p.id}">Edit</button>
+                          <button class="btn btn-sm btn-outline-danger delete-post" data-id="${p.id}">Delete</button>` : '';
+  const img = p.image_path ? `<img src="../${escapeHtml(p.image_path)}" class="post-image">` : '';
+  const avatar = p.profile_image
+    ? `<img src="../${escapeHtml(p.profile_image)}" class="rounded-circle me-2" style="width:40px;height:40px;object-fit:cover;">`
+    : `<div class="avatar me-2" style="width:40px;height:40px;font-size:1rem;">${escapeHtml(p.user_name.charAt(0).toUpperCase())}</div>`;
+  
   return `
     <div class="post-card" data-id="${p.id}">
       <div class="d-flex justify-content-between align-items-start">
-        <div class="d-flex align-items-center">
-          ${avatarHtml}
+        <div class="d-flex align-items-center gap-2">
+          ${avatar}
           <div>
             <div class="user-name">${escapeHtml(p.user_name)}</div>
-            <small class="small-muted">${formatDate(p.created_at)}</small>
+            <small class="text-muted">${created}</small>
           </div>
         </div>
-        ${controls}
+        <div>${controls}</div>
       </div>
-
-      <div class="post-content mt-3">${escapeHtml(p.content).replace(/\n/g,'<br>')}</div>
-      ${imageHtml}
-
-      <div class="mt-3 d-flex gap-3 align-items-center">
-        <button class="btn btn-sm btn-outline-primary like-post" data-post="${p.id}" data-liked="${p.user_liked?1:0}">${heart} <span class="like-count">${p.like_count||0}</span></button>
-        <button class="btn btn-sm btn-outline-secondary toggle-comments" data-post="${p.id}">💬 Comments (<span class="comment-count">${p.comment_count||0}</span>)</button>
+      <div class="mt-3 text-dark">${escapeHtml(p.content).replace(/\n/g,'<br>')}</div>
+      ${img}
+      <div class="mt-3 d-flex gap-2">
+        <button class="btn btn-sm btn-outline-primary like-btn">${liked} ${p.like_count||0}</button>
+        <button class="btn btn-sm btn-outline-secondary comment-toggle">💬 Comments (${p.comment_count||0})</button>
       </div>
-
-      <div class="comments mt-3" style="display:none;"></div>
+      <div class="comments mt-2" style="display:none;"></div>
     </div>`;
 }
 
-/* Render comments recursively */
-function renderCommentsHtml(comments){
-  let html = '';
-  function render(list, depth=0){
-    list.forEach(c=>{
-      const pad = depth * 18;
-      const liked = c.user_liked == 1;
-      const heart = liked ? '❤️' : '🤍';
-      const pic = c.profile_image ? `<img src="../${escapeHtml(c.profile_image)}" class="rounded-circle me-2" style="width:34px;height:34px;object-fit:cover;border:2px solid #fff;">`
-                                 : `<div class="avatar me-2" style="width:34px;height:34px;font-size:0.85rem;">${escapeHtml(c.user_name.charAt(0).toUpperCase())}</div>`;
-      html += `
-        <div class="d-flex comment-wrapper" style="margin-left:${pad}px;margin-bottom:8px;" data-comment-id="${c.id}">
-          ${pic}
-          <div style="flex:1;">
-            <div class="comment-box">
-              <div class="fw-semibold">${escapeHtml(c.user_name)}</div>
-              <div class="small-muted">${formatDate(c.created_at)}</div>
-              <div class="mt-1">${escapeHtml(c.text)}</div>
-              <div class="mt-2 small text-muted comment-controls">
-                <button class="btn btn-sm btn-outline-primary like-comment" data-id="${c.id}">${heart} <span class="c-like-count">${c.like_count||0}</span></button>
-                <button class="btn btn-sm btn-outline-secondary reply-btn" data-id="${c.id}">Reply</button>
-              </div>
-            </div>
-            <div class="replies mt-2"></div>
-          </div>
-        </div>
-      `;
-      if (c.replies && c.replies.length) render(c.replies, depth + 1);
-    });
-  }
-  render(comments);
-  return html;
-}
+// ===== Fetch JSON helper =====
+async function getJSON(url){ const r = await fetch(url); return r.json(); }
 
-/* Input block appended to bottom of comments */
-function commentInputHtml(){
-  return `
-    <div class="mt-2">
-      <div class="input-group input-group-sm">
-        <input type="text" class="form-control comment-input" placeholder="Add a comment...">
-        <button class="btn btn-gradient add-comment-btn">Post</button>
-      </div>
-    </div>`;
-}
-
-/* Count comments recursively (fallback if API doesn't return count) */
-function countCommentsRecursive(comments){
-  let n = 0;
-  function rec(list){
-    list.forEach(c=>{ n++; if(c.replies && c.replies.length) rec(c.replies); });
-  }
-  if(Array.isArray(comments)) rec(comments);
-  return n;
-}
-
-/* Update small aggregated stats on left from DOM (fast) */
-function updateSidebarStatsFromDOM(){
-  // postCount = number of .post-card nodes
-  const posts = document.querySelectorAll('.post-card');
-  document.getElementById('postCount').innerText = posts.length;
-  // likeCount = sum of .like-count in posts
-  let sumLikes = 0;
-  posts.forEach(p=>{
-    const span = p.querySelector('.like-count');
-    if(span) sumLikes += parseInt(span.textContent || '0');
-  });
-  document.getElementById('likeCount').innerText = sumLikes;
-}
-
-/* ========== Main load functions ========== */
+// ===== Load feed =====
 async function loadFeed(){
-  try{
-    const res = await getJSON('../api/fetch_posts.php');
-    const feed = document.getElementById('feed');
-    if(!res || !res.success){ feed.innerHTML = '<div class="alert alert-danger">Failed to load feed</div>'; return; }
-    feed.innerHTML = res.posts.map(renderPostCard).join('');
-    updateSidebarStatsFromDOM();
-  } catch(err){
-    console.error(err);
-    document.getElementById('feed').innerHTML = '<div class="alert alert-danger">Network error</div>';
-  }
+  const res = await getJSON(API_BASE + 'fetch_posts.php');
+  const feed = document.getElementById('feed');
+  if(!res.success){ feed.innerHTML='<div class="alert alert-danger">Failed to load posts</div>'; return; }
+  if(res.posts.length==0){ feed.innerHTML='<div class="alert alert-secondary">No posts yet</div>'; return; }
+  feed.innerHTML=res.posts.map(renderPost).join('');
+  const myPosts = res.posts.filter(p => p.user_id == <?= json_encode($userId) ?>);
+  document.getElementById('postCount').innerText = myPosts.length;
+  document.getElementById('likeCount').innerText = myPosts.reduce((sum,p)=>sum+(p.like_count||0),0);
 }
 
-async function loadPeople(){
-  try{
-    const res = await getJSON('../api/fetch_users.php');
-    const box = document.getElementById('peopleBox');
-    if(!res || !res.success){ box.innerHTML = '<div class="small-muted">Failed to load</div>'; return; }
-    box.innerHTML = res.users.map(u=>{
-      const pic = u.profile_image ? `<img src="../${escapeHtml(u.profile_image)}" class="rounded-circle me-2" style="width:34px;height:34px;object-fit:cover;">`
-                                : `<div class="avatar me-2" style="width:34px;height:34px;font-size:0.9rem;">${escapeHtml(u.name.charAt(0).toUpperCase())}</div>`;
-      return `<div class="d-flex align-items-center trend-item text-dark">${pic}<span>${escapeHtml(u.name)}</span></div>`;
-    }).join('');
-  } catch(err){ console.error(err); }
-}
-
-/* ========== Post creation (multipart) ========== */
-document.getElementById('postForm').addEventListener('submit', async function(e){
+// ===== Post new content =====
+document.getElementById('postForm').addEventListener('submit', async e=>{
   e.preventDefault();
-  const submitBtn = document.getElementById('postSubmit');
-  const fd = new FormData(this);
-  submitBtn.disabled = true; submitBtn.textContent = 'Posting...';
-  try{
-    // create_post.php should accept form-data { content, image } and return { success:true, post_id:... } on success
-    const res = await fetch('../api/create_post.php', { method: 'POST', body: fd }).then(r=>r.json());
-    if(res.success){
-      this.reset();
-      await loadFeed();
-    } else {
-      alert(res.error || 'Failed to create post');
-    }
-  } catch(err){
-    console.error(err);
-    alert('Network error while posting');
-  }
-  submitBtn.disabled = false; submitBtn.textContent = 'Post';
+  const fd = new FormData(e.target);
+  const res = await fetch(API_BASE + 'create_post.php',{method:'POST',body:fd}).then(r=>r.json());
+  if(res.success){ e.target.reset(); loadFeed(); } else alert(res.error||'Failed to post');
 });
 
-/* ========== Delegated interactions ========== */
-document.addEventListener('click', async function(e){
-  // ---------------- Post like/unlike ----------------
-  const likePostBtn = e.target.closest('.like-post');
-  if(likePostBtn){
-    const postId = likePostBtn.dataset.post;
-    const currentlyLiked = likePostBtn.dataset.liked === '1';
-    const countSpan = likePostBtn.querySelector('.like-count');
-    let count = parseInt(countSpan.textContent || '0');
-
-    // Optimistic UI:
-    if(currentlyLiked){
-      count = Math.max(0, count - 1);
-      likePostBtn.dataset.liked = '0';
-      likePostBtn.innerHTML = `🤍 <span class="like-count">${count}</span>`;
-    } else {
-      count = count + 1;
-      likePostBtn.dataset.liked = '1';
-      likePostBtn.innerHTML = `❤️ <span class="like-count">${count}</span>`;
-    }
-    updateSidebarStatsFromDOM();
-
-    // Backend toggle (expects toggle_like.php to toggle and return { success:true, status:'liked'|'unliked', likes:<count> })
-    try{
-      const res = await fetch('../api/toggle_like.php', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ post_id: postId }) }).then(r=>r.json());
-      if(!res.success){
-        // revert by reloading feed if backend failed
-        await loadFeed();
-        alert(res.error || 'Failed to toggle like');
-      } else {
-        // ensure count matches authoritative server
-        if(typeof res.likes !== 'undefined'){
-          const postCard = document.querySelector(`.post-card[data-id="${postId}"]`);
-          if(postCard){
-            const lc = postCard.querySelector('.like-count');
-            if(lc) lc.textContent = res.likes;
-          }
-        }
-        updateSidebarStatsFromDOM();
-      }
-    } catch(err){
-      console.error(err);
-      await loadFeed();
-    }
-    return;
+// ===== Like post =====
+document.addEventListener('click', async e=>{
+  if(e.target.closest('.like-btn')){
+    const btn = e.target.closest('.like-btn');
+    const postId = btn.closest('.post-card').dataset.id;
+    const res = await fetch(API_BASE + 'toggle_like.php',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({post_id:postId})
+    }).then(r=>r.json());
+    if(res.success) btn.innerHTML = (res.status==='liked'?'❤️':'🤍')+' '+res.likes;
   }
+});
 
-  // ---------------- Toggle comments (stay open until toggled) ----------------
-  const toggleCommentsBtn = e.target.closest('.toggle-comments');
-  if(toggleCommentsBtn){
-    const postId = toggleCommentsBtn.dataset.post;
-    const postCard = toggleCommentsBtn.closest('.post-card');
-    const commentsDiv = postCard.querySelector('.comments');
-    if(!commentsDiv) return;
-
-    if(commentsDiv.style.display === 'none' || commentsDiv.style.display === ''){
-      // open and load comment tree for this post
-      commentsDiv.style.display = 'block';
-      commentsDiv.innerHTML = '<div class="small-muted">Loading comments...</div>';
-      try{
-        const res = await getJSON(`../api/fetch_comments.php?post_id=${postId}`);
-        if(!res || !res.success){ commentsDiv.innerHTML = '<div class="text-danger small">Failed to load comments</div>'; return; }
-        // render comments and append comment input
-        commentsDiv.innerHTML = renderCommentsHtml(res.comments || []) + commentInputHtml();
-        attachCommentInputHandler(commentsDiv, postCard);
-        // update comment-count badge using authoritative count if provided, else compute
-        const count = (typeof res.count !== 'undefined') ? res.count : countCommentsRecursive(res.comments || []);
-        const ccEl = postCard.querySelector('.comment-count');
-        if(ccEl) ccEl.textContent = count;
-      } catch(err){
-        console.error(err);
-        commentsDiv.innerHTML = '<div class="text-danger small">Error loading comments</div>';
-      }
-    } else {
-      // close comments
-      commentsDiv.style.display = 'none';
-    }
-    return;
-  }
-
-  // ---------------- Add top-level comment ----------------
-  const addCommentBtn = e.target.closest('.add-comment-btn');
-  if(addCommentBtn){
-    const commentsDiv = addCommentBtn.closest('.comments');
-    const postCard = addCommentBtn.closest('.post-card');
-    const postId = postCard.dataset.id;
-    const input = commentsDiv.querySelector('.comment-input');
-    if(!input) return;
-    const text = input.value.trim();
-    if(!text) return;
-    addCommentBtn.disabled = true;
-    try{
-      // add_comment.php should accept JSON { post_id, text } and return { success:true }
-      const res = await fetch('../api/add_comment.php', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ post_id: postId, text }) }).then(r=>r.json());
-      addCommentBtn.disabled = false;
-      if(!res.success){ alert(res.error || 'Failed to add comment'); return; }
-
-      // Re-fetch comments for this post to get authoritative nested comments & count
-      const fresh = await getJSON(`../api/fetch_comments.php?post_id=${postId}`);
-      if(fresh && fresh.success){
-        commentsDiv.innerHTML = renderCommentsHtml(fresh.comments || []) + commentInputHtml();
-        attachCommentInputHandler(commentsDiv, postCard);
-        const ccEl = postCard.querySelector('.comment-count');
-        const count = (typeof fresh.count !== 'undefined') ? fresh.count : countCommentsRecursive(fresh.comments || []);
-        if(ccEl) ccEl.textContent = count;
-        input.value = '';
-      }
-    } catch(err){
-      console.error(err);
-      addCommentBtn.disabled = false;
-      alert('Network error while adding comment');
-    }
-    return;
-  }
-
-  // ---------------- Reply button: show inline reply input ----------------
-  const replyBtn = e.target.closest('.reply-btn');
-  if(replyBtn){
-    const wrapper = replyBtn.closest('.comment-wrapper');
-    if(!wrapper) return;
-    if(wrapper.querySelector('.reply-input')) return; // avoid duplicates
-    const parentId = replyBtn.dataset.id;
-    const replyBox = document.createElement('div');
-    replyBox.className = 'reply-input';
-    replyBox.innerHTML = `<div class="input-group input-group-sm mt-2">
-      <input type="text" class="form-control reply-text" placeholder="Write a reply...">
-      <button class="btn btn-gradient send-reply-btn" data-parent="${parentId}">Reply</button>
-    </div>`;
-    wrapper.appendChild(replyBox);
-    const input = replyBox.querySelector('.reply-text');
-    input.focus();
-    input.addEventListener('keypress', function(ev){ if(ev.key === 'Enter'){ ev.preventDefault(); replyBox.querySelector('.send-reply-btn').click(); } });
-    return;
-  }
-
-  // ---------------- Send inline reply ----------------
-  const sendReplyBtn = e.target.closest('.send-reply-btn');
-  if(sendReplyBtn){
-    const parentId = sendReplyBtn.dataset.parent;
-    const replyBox = sendReplyBtn.closest('.reply-input');
-    const textInput = replyBox.querySelector('.reply-text');
-    const text = textInput.value.trim();
-    if(!text) return;
-    sendReplyBtn.disabled = true;
-    try{
-      // reuse add_comment.php with parent_id; endpoint should accept { parent_id, text } and return { success:true }
-      const res = await fetch('../api/add_comment.php', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ parent_id: parentId, text }) }).then(r=>r.json());
-      sendReplyBtn.disabled = false;
-      if(!res.success){ alert(res.error || 'Failed to post reply'); return; }
-      // refresh comments for this post
-      const postCard = sendReplyBtn.closest('.post-card');
-      const postId = postCard.dataset.id;
-      const commentsDiv = postCard.querySelector('.comments');
-      const fresh = await getJSON(`../api/fetch_comments.php?post_id=${postId}`);
-      if(fresh && fresh.success){
-        commentsDiv.innerHTML = renderCommentsHtml(fresh.comments || []) + commentInputHtml();
-        attachCommentInputHandler(commentsDiv, postCard);
-        const ccEl = postCard.querySelector('.comment-count');
-        const count = (typeof fresh.count !== 'undefined') ? fresh.count : countCommentsRecursive(fresh.comments || []);
-        if(ccEl) ccEl.textContent = count;
-      }
-    } catch(err){
-      console.error(err);
-      sendReplyBtn.disabled = false;
-      alert('Network error while posting reply');
-    }
-    return;
-  }
-
-  // ---------------- Like/unlike comment ----------------
-  const likeCommentBtn = e.target.closest('.like-comment');
-  if(likeCommentBtn){
-    const commentId = likeCommentBtn.dataset.id;
-    const countSpan = likeCommentBtn.querySelector('.c-like-count');
-    let cnt = parseInt(countSpan.textContent || '0');
-    const isLiked = likeCommentBtn.classList.contains('liked');
-    if(isLiked){ cnt = Math.max(0, cnt - 1); likeCommentBtn.classList.remove('liked'); likeCommentBtn.innerHTML = `🤍 <span class="c-like-count">${cnt}</span>`; }
-    else { cnt = cnt + 1; likeCommentBtn.classList.add('liked'); likeCommentBtn.innerHTML = `❤️ <span class="c-like-count">${cnt}</span>`; }
-    try{
-      const res = await fetch('../api/toggle_comment_like.php', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ comment_id: commentId }) }).then(r=>r.json());
-      if(!res.success){ await loadFeed(); alert(res.error || 'Failed to toggle comment like'); }
-    } catch(err){
-      console.error(err);
-      await loadFeed();
-    }
-    return;
-  }
-
-  // ---------------- Delete post ----------------
-  const deleteBtn = e.target.closest('.delete-post');
-  if(deleteBtn){
+// ===== Delete post =====
+document.addEventListener('click', async e=>{
+  if(e.target.classList.contains('delete-post')){
     if(!confirm('Delete this post?')) return;
-    const postId = deleteBtn.dataset.id;
-    try{
-      const res = await fetch('../api/delete_post.php', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ post_id: postId }) }).then(r=>r.json());
-      if(res.success) await loadFeed(); else alert(res.error || 'Failed to delete');
-    } catch(err){
-      console.error(err); alert('Network error while deleting post');
-    }
-    return;
+    const id = e.target.dataset.id;
+    const res = await fetch(API_BASE + 'delete_post.php',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({post_id:id})
+    }).then(r=>r.json());
+    if(res.success) loadFeed(); else alert(res.error);
   }
+});
 
-  // ---------------- Edit post (inline) ----------------
-  const editBtn = e.target.closest('.edit-post');
-  if(editBtn){
-    const postCard = editBtn.closest('.post-card');
-    const postId = editBtn.dataset.id;
-    const contentDiv = postCard.querySelector('.post-content');
-    const currentText = contentDiv.innerText.trim();
-    const ta = document.createElement('textarea');
-    ta.className = 'form-control mb-2';
-    ta.value = currentText;
+// ===== Edit post =====
+document.addEventListener('click', async e=>{
+  if(e.target.classList.contains('edit-post')){
+    const card = e.target.closest('.post-card');
+    const id = card.dataset.id;
+    const contentDiv = card.querySelector('.text-dark');
+    const oldText = contentDiv.innerText.trim();
+
+    const textarea = document.createElement('textarea');
+    textarea.className = 'form-control mb-2';
+    textarea.value = oldText;
+
     const saveBtn = document.createElement('button');
     saveBtn.className = 'btn btn-sm btn-gradient me-2';
     saveBtn.textContent = 'Save';
+
     const cancelBtn = document.createElement('button');
     cancelBtn.className = 'btn btn-sm btn-outline-secondary';
     cancelBtn.textContent = 'Cancel';
-    const ctrl = document.createElement('div'); ctrl.className='mt-2'; ctrl.appendChild(saveBtn); ctrl.appendChild(cancelBtn);
-    contentDiv.innerHTML = ''; contentDiv.appendChild(ta); contentDiv.appendChild(ctrl);
-    cancelBtn.addEventListener('click', ()=> loadFeed());
-    saveBtn.addEventListener('click', async ()=>{
-      const newText = ta.value.trim();
+
+    const controlDiv = document.createElement('div');
+    controlDiv.className = 'mt-2';
+    controlDiv.appendChild(saveBtn);
+    controlDiv.appendChild(cancelBtn);
+
+    contentDiv.innerHTML = '';
+    contentDiv.appendChild(textarea);
+    contentDiv.appendChild(controlDiv);
+
+    cancelBtn.addEventListener('click', () => loadFeed());
+    saveBtn.addEventListener('click', async () => {
+      const newText = textarea.value.trim();
       if(!newText) return alert('Content cannot be empty');
-      saveBtn.disabled = true;
-      try{
-        const res = await fetch('../api/update_post.php', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ post_id: postId, content: newText }) }).then(r=>r.json());
-        saveBtn.disabled = false;
-        if(res.success) await loadFeed(); else alert(res.error || 'Failed to update');
-      } catch(err){
-        console.error(err); saveBtn.disabled=false; alert('Network error while updating');
-      }
+      const res = await fetch(API_BASE + 'update_post.php',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({post_id:id, content:newText})
+      }).then(r=>r.json());
+      if(res.success) loadFeed(); else alert(res.error||'Failed to update');
     });
-    return;
+  }
+});
+
+// ===== Comments & Replies =====
+document.addEventListener('click', async e=>{
+  // Toggle comments
+  if(e.target.classList.contains('comment-toggle')){
+    const postCard = e.target.closest('.post-card');
+    const commentDiv = postCard.querySelector('.comments');
+    const postId = postCard.dataset.id;
+    if(commentDiv.style.display==='none'||!commentDiv.style.display){
+      commentDiv.style.display='block';
+      commentDiv.innerHTML='<div class="text-muted small mb-2">Loading comments...</div>';
+      const res = await fetch(API_BASE + `fetch_comments.php?post_id=${postId}`).then(r=>r.json());
+      if(!res.success){ commentDiv.innerHTML='<div class="text-danger small">Error loading comments</div>'; return; }
+      renderComments(commentDiv, res.comments, postId);
+    } else commentDiv.style.display='none';
   }
 
-}); // end delegated handler
+  // Add comment
+  if(e.target.classList.contains('add-comment')){
+    const commentDiv = e.target.closest('.comments');
+    const postCard = e.target.closest('.post-card');
+    const postId = postCard.dataset.id;
+    const input = commentDiv.querySelector('input');
+    const text = input.value.trim();
+    if(!text) return;
+    const res = await fetch(API_BASE + 'add_comment.php',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({post_id:postId, text})
+    }).then(r=>r.json());
+    if(res.success){
+      input.value = '';
+      const refresh = await fetch(API_BASE + `fetch_comments.php?post_id=${postId}`).then(r=>r.json());
+      renderComments(commentDiv, refresh.comments, postId);
+      loadFeed(); // update comment count
+    }
+  }
 
-/* Attach Enter handler to comment input in provided commentsDiv */
-function attachCommentInputHandler(commentsDiv, postCard){
-  const input = commentsDiv.querySelector('.comment-input');
-  const btn = commentsDiv.querySelector('.add-comment-btn');
-  if(!input || !btn) return;
-  // remove existing handlers by cloning (avoid duplicate bindings)
-  const newInput = input.cloneNode(true);
-  input.parentNode.replaceChild(newInput, input);
-  newInput.addEventListener('keypress', function(e){
-    if(e.key === 'Enter'){ e.preventDefault(); btn.click(); }
-  });
+  // Reply to comment
+  if(e.target.classList.contains('reply-comment')){
+    const replyBtn = e.target;
+    const commentId = replyBtn.dataset.commentId;
+    const input = document.querySelector(`#reply-input-${commentId}`);
+    const text = input.value.trim();
+    if(!text) return;
+    const res = await fetch(API_BASE + 'add_reply.php',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({comment_id:commentId, text})
+    }).then(r=>r.json());
+    if(res.success){
+      input.value = '';
+      const postId = replyBtn.dataset.postId;
+      const commentDiv = document.querySelector(`.post-card[data-id='${postId}'] .comments`);
+      const refresh = await fetch(API_BASE + `fetch_comments.php?post_id=${postId}`).then(r=>r.json());
+      renderComments(commentDiv, refresh.comments, postId);
+    }
+  }
+
+  // Like comment
+  if(e.target.classList.contains('like-comment')){
+    const btn = e.target;
+    const commentId = btn.dataset.commentId;
+    const res = await fetch(API_BASE + 'toggle_comment_like.php',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({comment_id:commentId})
+    }).then(r=>r.json());
+    if(res.success) btn.innerText = (res.status==='liked'?'❤️':'🤍')+' '+res.likes;
+  }
+});
+
+// ===== Render comments =====
+function renderComments(container, comments, postId){
+  const commentsHtml = comments.map(c=>{
+    const pic = c.profile_image
+      ? `<img src="../${escapeHtml(c.profile_image)}" class="rounded-circle me-2" style="width:28px;height:28px;object-fit:cover;">`
+      : `<div class="avatar me-2" style="width:28px;height:28px;font-size:0.9rem;">${escapeHtml(c.user_name.charAt(0).toUpperCase())}</div>`;
+    return `<div class="d-flex align-items-start mb-2">
+      ${pic}
+      <div class="comment-box flex-grow-1">
+        <span class="fw-semibold">${escapeHtml(c.user_name)}</span><br>
+        <span>${escapeHtml(c.text)}</span>
+        <div class="mt-1 d-flex gap-2">
+          <button class="btn btn-sm btn-outline-primary like-comment" data-comment-id="${c.id}" data-post-id="${postId}">${c.user_liked==1?'❤️':'🤍'} ${c.like_count||0}</button>
+          <button class="btn btn-sm btn-outline-secondary reply-toggle" data-comment-id="${c.id}" data-post-id="${postId}">Reply</button>
+        </div>
+        <div class="reply-box mt-1" id="reply-box-${c.id}" style="display:none;">
+          <input type="text" class="form-control form-control-sm mb-1" placeholder="Write a reply..." id="reply-input-${c.id}">
+          <button class="btn btn-sm btn-gradient reply-comment" data-comment-id="${c.id}" data-post-id="${postId}">Post</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+  container.innerHTML = commentsHtml + `
+    <div class="input-group input-group-sm mt-2">
+      <input type="text" class="form-control comment-input" placeholder="Add a comment...">
+      <button class="btn btn-gradient add-comment">Post</button>
+    </div>`;
 }
 
-/* ===== initial load ===== */
+// ===== Load people (sidebar) =====
+async function loadPeople(){
+  const res = await getJSON(API_BASE + 'fetch_users.php');
+  const box = document.getElementById('peopleBox');
+  if(!res.success){ box.innerHTML='<div class="text-muted small">Failed</div>'; return; }
+  box.innerHTML = res.users.map(u=>{
+    const pic = u.profile_image
+      ? `<img src="../${escapeHtml(u.profile_image)}" class="rounded-circle me-2" style="width:30px;height:30px;object-fit:cover;">`
+      : `<div class="avatar me-2" style="width:30px;height:30px;font-size:0.9rem;">${escapeHtml(u.name.charAt(0).toUpperCase())}</div>`;
+    return `<div class="d-flex align-items-center trend-item text-dark">
+              ${pic}<span>${escapeHtml(u.name)}</span>
+            </div>`;
+  }).join('');
+}
+
+// ===== Initial load =====
 loadPeople();
 loadFeed();
 </script>
+
 </body>
 </html>
