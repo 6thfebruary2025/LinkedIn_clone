@@ -1,5 +1,5 @@
 <?php
-// Railway environment variables
+// Railway environment variable
 $DB_HOST = getenv('MYSQLHOST') ?: 'localhost';
 $DB_NAME = getenv('MYSQL_DATABASE') ?: 'your_db_name';
 $DB_USER = getenv('MYSQLUSER') ?: 'root';
