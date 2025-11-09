@@ -1,14 +1,23 @@
 <?php
-// Railway environment variable
-$DB_HOST = getenv('MYSQLHOST') ?: 'localhost';
-$DB_NAME = getenv('MYSQL_DATABASE') ?: 'your_db_name';
-$DB_USER = getenv('MYSQLUSER') ?: 'root';
-$DB_PASS = getenv('MYSQLPASSWORD') ?: '';
+// config.php - Railway-ready
 
-try {
-    $pdo = new PDO("mysql:host=$DB_HOST;dbname=$DB_NAME;charset=utf8", $DB_USER, $DB_PASS);
-    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-} catch(PDOException $e) {
-    die("Database connection failed: " . $e->getMessage());
+// Fetch environment variables set by Railway
+$host = getenv('MYSQLHOST') ?: getenv('MYSQL_URL');       // Database host
+$db   = getenv('MYSQLDATABASE') ?: getenv('MYSQL_DATABASE'); // Database name
+$user = getenv('MYSQLUSER') ?: getenv('MYSQL_USER');     // DB username
+$pass = getenv('MYSQLPASSWORD') ?: getenv('MYSQL_ROOT_PASSWORD'); // DB password
+$port = getenv('MYSQLPORT') ?: 3306;                     // Default MySQL port
+
+// Create connection
+$conn = new mysqli($host, $user, $pass, $db, $port);
+
+// Check connection
+if ($conn->connect_error) {
+    die("Database Connection Failed: " . $conn->connect_error);
 }
 
+// Optional: set charset
+$conn->set_charset("utf8mb4");
+
+// Now you can use $conn in all your backend API files (fetch_posts.php, add_comment.php, etc.)
+?>
