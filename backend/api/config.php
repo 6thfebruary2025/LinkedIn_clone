@@ -20,4 +20,8 @@ if ($conn->connect_error) {
 $conn->set_charset("utf8mb4");
 
 // Now you can use $conn in all your backend API files (fetch_posts.php, add_comment.php, etc.)
+<<<<<<< HEAD
 ?>
+=======
+?>
+>>>>>>> a0e986e (Update config and feed files)
