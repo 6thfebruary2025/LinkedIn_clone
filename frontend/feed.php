@@ -114,7 +114,7 @@ $profileImage = $_SESSION['profile_image'] ?? null;
 </div>
 
 <script>
-const API_BASE = 'https://your-backend.up.railway.app/api/'; // <-- REPLACE with your Railway backend URL
+const API_BASE = 'https://astonishing-essence.up.railway.app/api/'; // <-- REPLACE with your Railway backend URL
 
 function escapeHtml(text){ if(!text) return ''; return text.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
 
