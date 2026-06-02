@@ -4,7 +4,7 @@ A full-stack social media web application inspired by LinkedIn. Users can create
 
 ---
 
-## 🔧 Tech Stack
+##  Tech Stack
 
 - **Frontend:** HTML, CSS (Bootstrap), JavaScript  
 - **Backend:** PHP, MySQL  
@@ -12,7 +12,7 @@ A full-stack social media web application inspired by LinkedIn. Users can create
 
 ---
 
-## ✨ Features
+##  Features
 
 1. **User Authentication**
    - Signup and login functionality
@@ -42,7 +42,7 @@ A full-stack social media web application inspired by LinkedIn. Users can create
 
 ---
 
-## 📂 Project Structure
+##  Project Structure
 project-root/
 │
 ├─ public/
@@ -70,7 +70,7 @@ project-root/
 
 ---
 
-## 🚀 How to Run Locally
+##  How to Run Locally
 
 1. Clone the repository:
 
@@ -97,6 +97,6 @@ Live Project
 
 Frontend & Backend URL:
 
-📌 GitHub Repository
+GitHub Repository
 
 GitHub Repo Link
