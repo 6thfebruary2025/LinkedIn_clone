@@ -5,11 +5,12 @@ if (empty($_SESSION['user_id'])) {
   exit;
 }
 
+// Fixed absolute directory reference mapping from public/ to root/api/
 require_once __DIR__ . '/../api/config.php';
 
 $userId = $_GET['user_id'] ?? $_SESSION['user_id'];
 
-// Fetch user info
+// Fetch user info via standard PDO mapping settled in config.php
 $stmt = $pdo->prepare("SELECT id, name, email, profile_image, about, skills, created_at FROM users WHERE id = ?");
 $stmt->execute([$userId]);
 $user = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -30,258 +31,136 @@ $isOwnProfile = ($userId == $_SESSION['user_id']);
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
   <style>
-    :root {
-      --linkedin-blue: #0a66c2;
-      --linkedin-bg: #f3f2ef;
-      --card-radius: 8px;
-    }
-    body {
-      background: var(--linkedin-bg);
-      font-family: "Inter", system-ui, sans-serif;
-    }
-
-    .navbar {
-      background: linear-gradient(135deg, #0077b5, var(--linkedin-blue));
-    }
-    .btn-linkedin {
-      background-color: var(--linkedin-blue);
-      color: #fff;
-      border-radius: 4px;
-      font-weight: 500;
-    }
-    .btn-linkedin:hover {
-      background-color: #004182;
-      color: #fff;
-    }
-
-    .cover {
-      height: 230px;
-      background: linear-gradient(135deg, #0077b5, var(--linkedin-blue));
-      position: relative;
-    }
-    .profile-container {
-      max-width: 900px;
-      margin: -80px auto 40px;
-    }
-    .profile-card {
-      background: #fff;
-      border-radius: var(--card-radius);
-      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
-      padding: 20px;
-      position: relative;
-    }
-    .profile-photo {
-      width: 150px;
-      height: 150px;
-      border-radius: 50%;
-      object-fit: cover;
-      border: 4px solid #fff;
-      position: absolute;
-      top: -75px;
-      left: 30px;
-      background: #fff;
-    }
-    .profile-info {
-      margin-left: 200px;
-      margin-top: 20px;
-    }
-    .profile-info h3 {
-      font-weight: 600;
-      margin-bottom: 5px;
-    }
-    .profile-info p {
-      color: #666;
-      margin: 0;
-    }
-    .section-card {
-      background: #fff;
-      border-radius: var(--card-radius);
-      box-shadow: 0 2px 6px rgba(0,0,0,0.08);
-      padding: 25px;
-      margin-top: 20px;
-    }
-    .post-card {
-      background: #fff;
-      border-radius: var(--card-radius);
-      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
-      padding: 20px;
-      margin-bottom: 15px;
-    }
-    .post-card img {
-      max-width: 100%;
-      border-radius: 6px;
-      margin-top: 10px;
-    }
-    .upload-label {
-      color: var(--linkedin-blue);
-      font-size: 0.9rem;
-      cursor: pointer;
-      display: inline-block;
-      margin-top: 8px;
-    }
+    body { background-color: #f3f6f9; font-family: system-ui, -apple-system, sans-serif; }
+    .profile-banner { height: 150px; background: linear-gradient(135deg, #0077b5, #0a66c2); border-top-left-radius: 8px; border-top-right-radius: 8px; }
+    .avatar-holder { margin-top: -75px; margin-left: 24px; }
+    .avatar-img { width: 150px; height: 150px; object-fit: cover; border: 4px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+    .card-custom { background: white; border: 1px solid #e0e0e0; border-radius: 8px; margin-bottom: 20px; padding: 24px; }
   </style>
 </head>
 <body>
 
-<nav class="navbar navbar-expand-lg navbar-dark shadow-sm">
-  <div class="container d-flex justify-content-between align-items-center">
-    <a class="navbar-brand fw-semibold" href="feed.php">LinkedIn Clone</a>
-    <div class="d-flex align-items-center gap-3 text-white">
-      <span><?= htmlspecialchars($_SESSION['user_name']) ?></span>
-      <a href="logout.php" class="btn btn-linkedin">Logout</a>
-    </div>
-  </div>
-</nav>
-
-<div class="cover"></div>
-
-<div class="profile-container">
-  <div class="profile-card">
-    <?php if ($user['profile_image']): ?>
-      <img src="../<?= htmlspecialchars($user['profile_image']) ?>" class="profile-photo" alt="Profile">
-    <?php else: ?>
-      <img src="https://ui-avatars.com/api/?name=<?= urlencode($user['name']) ?>&background=0077b5&color=fff" class="profile-photo" alt="Profile">
-    <?php endif; ?>
-
-    <div class="profile-info">
-      <h3><?= htmlspecialchars($user['name']) ?></h3>
-      <p><?= htmlspecialchars($user['email']) ?></p>
-      <p class="text-muted small">Member since <?= date('F Y', strtotime($user['created_at'])) ?></p>
-      <p class="text-muted small">Posts: <?= $postCount ?></p>
-      <?php if ($isOwnProfile): ?>
-        <form id="uploadForm" enctype="multipart/form-data" class="mt-1">
-          <input type="file" name="profile_image" id="profileImageInput" accept="image/*" hidden>
-          <label for="profileImageInput" class="upload-label">Change profile picture</label>
-        </form>
-      <?php endif; ?>
-    </div>
-  </div>
-
-  <!-- About Section -->
-  <div class="section-card">
-    <div class="d-flex justify-content-between align-items-center mb-2">
-      <h5 class="fw-semibold mb-0">About</h5>
-      <?php if ($isOwnProfile): ?>
-        <button class="btn btn-sm btn-linkedin" data-bs-toggle="modal" data-bs-target="#editAboutModal">Edit</button>
-      <?php endif; ?>
-    </div>
-    <p id="aboutText"><?= $user['about'] ? nl2br(htmlspecialchars($user['about'])) : '<span class="text-muted">No about info added.</span>' ?></p>
-  </div>
-
-  <!-- Skills Section -->
-  <div class="section-card">
-    <div class="d-flex justify-content-between align-items-center mb-2">
-      <h5 class="fw-semibold mb-0">Skills</h5>
-      <?php if ($isOwnProfile): ?>
-        <button class="btn btn-sm btn-linkedin" data-bs-toggle="modal" data-bs-target="#editSkillsModal">Edit</button>
-      <?php endif; ?>
-    </div>
-    <?php if ($user['skills']): ?>
-      <?php
-        $skills = explode(',', $user['skills']);
-        foreach($skills as $s){
-          echo '<span class="badge bg-light text-dark border me-1 mb-1">'.htmlspecialchars(trim($s)).'</span>';
-        }
-      ?>
-    <?php else: ?>
-      <p class="text-muted mb-0">No skills added.</p>
-    <?php endif; ?>
-  </div>
-
-  <!-- Posts Section -->
-  <div class="section-card">
-    <h5 class="fw-semibold mb-3">Recent Posts</h5>
-    <div id="userPosts"></div>
-  </div>
-</div>
-
-<!-- Edit About Modal -->
-<div class="modal fade" id="editAboutModal" tabindex="-1">
-  <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title">Edit About</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+  <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
+    <div class="container">
+      <a class="navbar-brand" href="feed.php">LinkedIn Clone</a>
+      <div class="navbar-nav ms-auto">
+        <a class="nav-link text-white" href="feed.php">Home Feed</a>
+        <a class="nav-link text-white" href="logout.php">Logout</a>
       </div>
-      <div class="modal-body">
+    </div>
+  </nav>
+
+  <div class="container">
+    <div class="row justify-content-center">
+      <div class="col-md-8">
+        
+        <div class="card-custom p-0 overflow-hidden">
+          <div class="profile-banner"></div>
+          <div class="avatar-holder d-flex align-items-end justify-content-between pe-4 pb-3">
+            <div class="position-relative">
+              <img src="../<?= !empty($user['profile_image']) ? htmlspecialchars($user['profile_image']) : 'assets/default-avatar.png' ?>" class="rounded-circle avatar-img bg-light" id="profileAvatar">
+              <?php if ($isOwnProfile): ?>
+                <input type="file" id="profileImageInput" class="d-none" accept="image/*">
+                <button class="btn btn-sm btn-light position-absolute bottom-0 end-0 border" onclick="document.getElementById('profileImageInput').click();">📷</button>
+              <?php endif; ?>
+            </div>
+          </div>
+          <div class="px-4 pb-4">
+            <h2 class="fw-bold m-0"><?= htmlspecialchars($user['name']) ?></h2>
+            <p class="text-muted"><?= htmlspecialchars($user['email']) ?></p>
+            <div class="badge bg-secondary"><?= $postCount ?> Total Posts</div>
+          </div>
+        </div>
+
+        <div class="card-custom">
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <h4 class="fw-bold m-0">About</h4>
+            <?php if ($isOwnProfile): ?>
+              <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editAboutModal">Edit</button>
+            <?php endif; ?>
+          </div>
+          <p class="text-secondary mb-0"><?= !empty($user['about']) ? nl2br(htmlspecialchars($user['about'])) : 'No about description provided yet.' ?></p>
+        </div>
+
+        <div class="card-custom">
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <h4 class="fw-bold m-0">Skills</h4>
+            <?php if ($isOwnProfile): ?>
+              <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editSkillsModal">Edit</button>
+            <?php endif; ?>
+          </div>
+          <p class="text-secondary mb-0"><?= !empty($user['skills']) ? htmlspecialchars($user['skills']) : 'No skills listed yet.' ?></p>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <?php if ($isOwnProfile): ?>
+  <div class="modal fade" id="editAboutModal" mercantile-tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-content">
         <form id="editAboutForm">
-          <textarea name="about" class="form-control" rows="5"><?= htmlspecialchars($user['about'] ?? '') ?></textarea>
+          <div class="modal-header">
+            <h5 class="modal-title">Edit About Details</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">
+            <textarea class="form-control" name="about" rows="4"><?= htmlspecialchars($user['about'] ?? '') ?></textarea>
+          </div>
+          <div class="modal-content modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+            <button type="button" class="btn btn-primary" id="saveAboutBtn">Save Changes</button>
+          </div>
         </form>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-        <button type="button" id="saveAboutBtn" class="btn btn-linkedin">Save</button>
       </div>
     </div>
   </div>
-</div>
 
-<!-- Edit Skills Modal -->
-<div class="modal fade" id="editSkillsModal" tabindex="-1">
-  <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title">Edit Skills (comma separated)</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-      </div>
-      <div class="modal-body">
+  <div class="modal fade" id="editSkillsModal" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-content">
         <form id="editSkillsForm">
-          <input type="text" name="skills" class="form-control" value="<?= htmlspecialchars($user['skills'] ?? '') ?>">
+          <div class="modal-header">
+            <h5 class="modal-title">Edit Skills Set</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">
+            <input type="text" class="form-control" name="skills" value="<?= htmlspecialchars($user['skills'] ?? '') ?>" placeholder="e.g. PHP, JavaScript, SQL">
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+            <button type="button" class="btn btn-primary" id="saveSkillsBtn">Save Changes</button>
+          </div>
         </form>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-        <button type="button" id="saveSkillsBtn" class="btn btn-linkedin">Save</button>
       </div>
     </div>
   </div>
-</div>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-<script>
-async function getJSON(url){ const r = await fetch(url); return r.json(); }
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    // Handles runtime environment routing dynamically for production
+    const API_PREFIX = window.location.pathname.includes('/public/') ? '../api/' : '/api/';
 
-async function loadUserPosts(){
-  const res = await getJSON('../api/fetch_posts.php');
-  const box = document.getElementById('userPosts');
-  if(!res.success){ box.innerHTML='<div class="alert alert-danger">Could not load posts</div>'; return; }
-  const posts = res.posts.filter(p => p.user_id == <?= json_encode($userId) ?>);
-  if(posts.length === 0){ box.innerHTML='<div class="text-muted">No posts yet.</div>'; return; }
+    document.getElementById('profileImageInput').addEventListener('change', async function() {
+      const formData = new FormData();
+      formData.append('profile_image', this.files[0]);
+      const res = await fetch(API_PREFIX + 'upload_profile_image.php', { method:'POST', body:formData }).then(r=>r.json());
+      if(res.success){ location.reload(); } else { alert(res.error || 'Upload error'); }
+    });
 
-  box.innerHTML = posts.map(p => `
-    <div class="post-card">
-      <div>${p.content}</div>
-      ${p.image_path ? `<img src="../${p.image_path}" alt="Post image">` : ''}
-      <small class="text-muted d-block mt-2">${new Date(p.created_at).toLocaleString()}</small>
-    </div>
-  `).join('');
-}
+    document.getElementById('saveAboutBtn').addEventListener('click', async () => {
+      const formData = new FormData(document.getElementById('editAboutForm'));
+      const res = await fetch(API_PREFIX + 'update_about.php', { method:'POST', body:formData }).then(r=>r.json());
+      if(res.success){ location.reload(); }
+    });
 
-<?php if ($isOwnProfile): ?>
-// Profile image upload
-document.getElementById('profileImageInput').addEventListener('change', async function(){
-  const formData = new FormData();
-  formData.append('profile_image', this.files[0]);
-  const res = await fetch('../api/upload_profile_image.php', { method:'POST', body:formData }).then(r=>r.json());
-  if(res.success){ location.reload(); }
-});
-
-// Save About
-document.getElementById('saveAboutBtn').addEventListener('click', async ()=>{
-  const formData = new FormData(document.getElementById('editAboutForm'));
-  const res = await fetch('../api/update_about.php',{method:'POST',body:formData}).then(r=>r.json());
-  if(res.success){ location.reload(); }
-});
-
-// Save Skills
-document.getElementById('saveSkillsBtn').addEventListener('click', async ()=>{
-  const formData = new FormData(document.getElementById('editSkillsForm'));
-  const res = await fetch('../api/update_skills.php',{method:'POST',body:formData}).then(r=>r.json());
-  if(res.success){ location.reload(); }
-});
-<?php endif; ?>
-
-loadUserPosts();
-</script>
+    document.getElementById('saveSkillsBtn').addEventListener('click', async () => {
+      const formData = new FormData(document.getElementById('editSkillsForm'));
+      const res = await fetch(API_PREFIX + 'update_skills.php', { method:'POST', body:formData }).then(r=>r.json());
+      if(res.success){ location.reload(); }
+    });
+  </script>
+  <?php endif; ?>
 </body>
 </html>
