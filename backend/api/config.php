@@ -1,27 +1,24 @@
 <?php
-// config.php - Railway-ready
+// config.php - Unified Database Connection
 
-// Fetch environment variables set by Railway
-$host = getenv('MYSQLHOST') ?: getenv('MYSQL_URL');       // Database host
-$db   = getenv('MYSQLDATABASE') ?: getenv('MYSQL_DATABASE'); // Database name
-$user = getenv('MYSQLUSER') ?: getenv('MYSQL_USER');     // DB username
-$pass = getenv('MYSQLPASSWORD') ?: getenv('MYSQL_ROOT_PASSWORD'); // DB password
-$port = getenv('MYSQLPORT') ?: 3306;                     // Default MySQL port
-
-// Create connection
-$conn = new mysqli($host, $user, $pass, $db, $port);
-
-// Check connection
-if ($conn->connect_error) {
-    die("Database Connection Failed: " . $conn->connect_error);
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
 }
 
-// Optional: set charset
-$conn->set_charset("utf8mb4");
+$host = getenv('MYSQLHOST') ?: getenv('MYSQL_HOST') ?: getenv('MYSQL_URL') ?: 'localhost';
+$dbname = getenv('MYSQLDATABASE') ?: getenv('MYSQL_DATABASE') ?: 'linkedin_clone';
+$username = getenv('MYSQLUSER') ?: getenv('MYSQL_USER') ?: 'root';
+$password = getenv('MYSQLPASSWORD') ?: getenv('MYSQL_PASSWORD') ?: ''; 
+$port = getenv('MYSQLPORT') ?: getenv('MYSQL_PORT') ?: 3306;
 
-// Now you can use $conn in all your backend API files (fetch_posts.php, add_comment.php, etc.)
-<<<<<<< HEAD
+$conn = new mysqli($host, $username, $password, $dbname, $port);
+
+if ($conn->connect_error) {
+    die(json_encode(['success' => false, 'error' => 'Database connection failed: ' . $conn->connect_error]));
+}
+
+$conn->set_charset('utf8mb4');
+
+// Alias to fix any files using $conn or $db
+$db = $conn; 
 ?>
-=======
-?>
->>>>>>> a0e986e (Update config and feed files)
